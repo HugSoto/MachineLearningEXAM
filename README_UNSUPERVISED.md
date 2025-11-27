@@ -1,68 +1,76 @@
 # Informe de Aprendizaje No Supervisado (EA3)
 
-**Asignatura:** Machine Learning \- Duoc UC **Proyecto:** Scoring de Riesgo Crediticio
-
-## 1\. Descripción de la Técnica y Justificación
-
-Para la exploración no supervisada del dataset *Home Credit*, se implementó una estrategia combinada de **Reducción de Dimensionalidad (PCA)** seguida de **Clustering (K-Means)**.
-
-### Justificación de la elección:
-
-1. **Alta Dimensionalidad:** El dataset original (`application_.parquet`) cuenta con más de 120 variables. Aplicar clustering directamente sobre este volumen de datos genera la "maldición de la dimensionalidad", donde las distancias euclidianas pierden sentido y el ruido dificulta la segmentación.  
-2. **Multicolinealidad:** Existen muchas variables altamente correlacionadas (ej. distintos tipos de ingresos o promedios de montos). **PCA (Principal Component Analysis)** permitió compactar esta información, reteniendo el 95% de la varianza explicada y eliminando redundancia.  
-3. **Segmentación Latente:** Se eligió **K-Means** sobre los componentes principales para identificar grupos homogéneos de clientes. El objetivo era descubrir si existen perfiles "naturales" de riesgo sin utilizar explícitamente la etiqueta de `TARGET` durante el entrenamiento del algoritmo.
+**Asignatura:** Machine Learning - Duoc UC
+**Proyecto:** Scoring de Riesgo Crediticio
+**Metodología:** CRISP-DM
 
 ---
 
-## 2\. Instrucciones de Ejecución
+## 1. Introducción y Enfoque Metodológico (CRISP-DM)
 
-El código se encuentra en el archivo `EA3_PRACTICO.py`.
+Siguiendo la lógica del proceso **CRISP-DM**, se ha desarrollado una fase exploratoria de **Modelado No Supervisado** para complementar el modelo predictivo principal.
+
+### Selección de la Técnica
+Se optó por una estrategia híbrida que combina dos de las sugerencias del enunciado:
+1.  **Reducción de Dimensionalidad (PCA):** Para mitigar la redundancia entre variables correlacionadas.
+2.  **Clustering (K-Means):** Para segmentar clientes basándose en sus componentes principales.
+
+### Justificación de la Elección
+El dataset *Home Credit* presenta desafíos que justifican este enfoque:
+* **Alta Dimensionalidad:** Con más de 120 variables, el cálculo de distancias para clustering se ve afectado por la "maldición de la dimensionalidad". PCA permite compactar la varianza en menos dimensiones, haciendo el clustering más robusto.
+* **Detección de Patrones Latentes:** Se busca identificar si existen subgrupos de clientes ("Clusters") que compartan comportamientos financieros intrínsecos, invisibles al analizar variables por separado.
+
+> **Nota sobre Data Leakage:** Cumpliendo estrictamente con las buenas prácticas, todo el entrenamiento de PCA y K-Means se realizó **exclusivamente sobre el set de entrenamiento**, sin "ver" datos de validación o prueba.
+
+---
+
+## 2. Instrucciones de Ejecución
+
+El código fuente se encuentra en el archivo `EA3_PRACTICO.py`.
 
 **Requisitos previos:**
-
-* Python 3.8+  
+* Python 3.8+
 * Librerías: `pandas`, `numpy`, `scikit-learn`, `matplotlib`, `seaborn`, `pyarrow`.
 
 **Pasos para ejecutar:**
-
-1. Asegúrese de que el archivo de datos `application_.parquet` se encuentre en la misma carpeta que el script.  
-2. Ejecute el script desde la terminal:  
-     
-   python EA3_PRACTICO.py  
-     
-3. **Nota durante la ejecución:** El script mostrará primero una ventana con las gráficas de *Elbow* y *Silhouette*. **Debe cerrar esta ventana** para que el programa seleccione el mejor **k** automáticamente y proceda a generar el clustering final.
-
----
-
-## 3\. Análisis e Interpretación de Resultados
-
-### Determinación del número de Clusters (**k)**
-
-Se utilizó una búsqueda iterativa de **k=2** a **k=8** evaluando dos métricas:
-
-* **Silhouette Score:** Mostró su valor máximo (aprox **0.361**) con **k=2**. Esto indica que la estructura más fuerte y natural en los datos es una división binaria.  
-* **Método del Codo (Inertia):** La curva presentó una caída suave sin un quiebre brusco, lo que, combinado con el Silhouette, confirmó la elección de 2 segmentos principales.
-
-### Caracterización de los Segmentos
-
-Tras aplicar K-Means con **k=2** sobre todo el dataset, se obtuvieron los siguientes perfiles de riesgo (cruzando *a posteriori* con la variable `TARGET`):
-
-| Cluster | Cantidad Clientes | Tasa de Incumplimiento (Default Rate) | Perfil Observado |
-| :---- | :---- | :---- | :---- |
-| **Cluster 0** | 272,458 | **8.42%** | Grupo Mayoritario (Riesgo Estándar/Alto) |
-| **Cluster 1** | 35,053 | **5.41%** | Grupo Minoritario (Bajo Riesgo) |
-
-**Interpretación del Negocio:** El algoritmo logró identificar un segmento específico de clientes (**Cluster 1**, aprox. 11% de la cartera) que presenta un comportamiento de pago significativamente mejor que el promedio. Mientras que el grupo masivo tiene una tasa de mora del 8.42%, este subgrupo baja al 5.41%. Esto sugiere que existen características latentes (posiblemente mayor edad, estabilidad laboral o tipo de producto) que hacen a este grupo más "seguro" para la institución.
+1. Se recomienda instalar las dependencias exactas para evitar errores con la lectura del formato Parquet:
+    ```bash
+    pip install pandas numpy scikit-learn matplotlib seaborn pyarrow
+    ```
+2.  Asegúrese de que el archivo de datos `application_.parquet` esté en la misma carpeta que el script.
+3.  Ejecute el script desde la terminal:
+    ```bash
+    python EA3_PRACTICO.py
+    ```
+4.  **Importante:** El script generará visualizaciones interactivas (Curva de Codo y Silhouette). **Debe cerrar la ventana del gráfico** para que el programa continúe con el cálculo final de los clusters y la generación de estadísticas.
 
 ---
 
-## 4\. Discusión: Integración al Proyecto Final
+## 3. Análisis e Interpretación de Resultados
 
-¿Es útil este método para el modelo supervisado de Scoring? **SÍ.**
+### Determinación del número óptimo de Clusters (k)
+Se evaluó un rango de **k=2** a **k=8**.
+* **Métrica Silhouette:** Alcanzó su máximo (**~0.361**) con **k=2**, sugiriendo una estructura binaria natural en los datos.
+* **Inertia (Codo):** No mostró un quiebre brusco, lo que refuerza la decisión de guiarse por el Silhouette Score para evitar sobre-segmentar ruido.
 
-**Estrategia de incorporación:**
+### Caracterización de los Segmentos (Vinculación con el Negocio)
+Tras aplicar la segmentación, se cruzaron los clusters con la variable objetivo `TARGET` (tasa de morosidad) para validar su utilidad:
 
-1. **Feature Engineering:** Se añadirá la columna `Cluster_ID` como una nueva variable categórica en el dataset de entrenamiento.  
-2. **Valor Predictivo:** Dado que hay una diferencia de casi **3 puntos porcentuales** en la tasa de riesgo entre ambos clusters, esta variable ayudará al modelo supervisado (XGBoost/LightGBM) a premiar o castigar el score dependiendo del segmento al que pertenezca el solicitante.  
-3. **Prevención de Data Leakage:** Todo el proceso (ajuste de PCA y K-Means) se realizó utilizando **estrictamente el set de entrenamiento** (filas con TARGET disponible), garantizando la integridad de la evaluación final.
+| Cluster | Perfil Identificado | Cantidad Clientes | Tasa de Incumplimiento (Default Rate) | Diferencia vs Promedio |
+| :--- | :--- | :--- | :--- | :--- |
+| **Cluster 0** | Riesgo Estándar/Alto | 272,458 | **8.42%** | +0.35% |
+| **Cluster 1** | **Bajo Riesgo** | 35,053 | **5.41%** | **-2.66%** |
 
+**Hallazgo:** El método no supervisado logró aislar exitosamente un segmento (Cluster 1, aprox. 11% de la muestra) cuyo riesgo es significativamente menor al del resto de la cartera. Esto valida que la combinación de variables comprimidas por PCA contiene información predictiva real sobre el comportamiento de pago.
+
+---
+
+## 4. Discusión e Integración al Proyecto Final
+
+**¿Es recomendable incorporar este método al modelo supervisado?**
+**SÍ.**
+
+### Argumentación Técnica
+1.  **Feature Engineering:** La variable `Cluster_ID` se incorporará como una nueva característica categórica (o *meta-feature*) en el modelo supervisado (XGBoost/LightGBM).
+2.  **Captura de No-Linealidad:** Al usar PCA + K-Means, estamos capturando interacciones complejas y no lineales entre las variables originales. Entregarle esta información pre-procesada al modelo supervisado le ayuda a distinguir más fácilmente entre perfiles de riesgo.
+3.  **Valor de Negocio:** La diferencia de casi **3 puntos porcentuales** en la tasa de default entre clusters demuestra que esta variable tiene un alto poder discriminante ("Information Value"), lo que debería mejorar métricas como el AUC-ROC en el modelo final.
