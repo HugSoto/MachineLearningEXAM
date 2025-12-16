@@ -24,7 +24,6 @@ def train():
         print("Error: No existe la columna TARGET")
         return
 
-    # Seleccionar solo numericas
     X = df.select_dtypes(include=[np.number]).drop(columns=['TARGET', 'SK_ID_CURR'], errors='ignore')
     y = df['TARGET']
     
@@ -34,11 +33,15 @@ def train():
     
     ratio = float(np.sum(y == 0)) / np.sum(y == 1)
     
+    print("Ajustando desbalance (Ratio: {:.2f})...".format(ratio))
+    
     model = XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.1,
-        scale_pos_weight=ratio,
+        n_estimators=200,
+        max_depth=5,  
+        learning_rate=0.05, 
+        scale_pos_weight=ratio, 
+        subsample=0.8,     
+        colsample_bytree=0.8,
         random_state=42,
         n_jobs=-1
     )
