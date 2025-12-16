@@ -1,6 +1,5 @@
 import os
 
-# Estructura exigida en el examen (CRISP-DM)
 folders = [
     "01_data_understanding",
     "02_data_preparation",
@@ -17,15 +16,12 @@ files = {
 }
 
 def create_structure():
-    # Crear carpetas
     for folder in folders:
         os.makedirs(folder, exist_ok=True)
-        # Crear un .gitkeep para que git suba la carpeta aunque esté vacía
         with open(os.path.join(folder, ".gitkeep"), "w") as f:
             pass
         print(f"✅ Carpeta creada: {folder}")
 
-    # Crear archivos base
     for filename, content in files.items():
         with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
