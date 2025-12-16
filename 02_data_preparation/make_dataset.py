@@ -9,17 +9,22 @@ OUTPUT_FILE = os.path.join(OUTPUT_FOLDER, "master_table.parquet")
 
 def agg_numeric(df, group_var, df_name):
     numeric_df = df.select_dtypes('number')
+    if group_var in numeric_df.columns:
+        numeric_df = numeric_df.drop(columns=[group_var])
     numeric_df[group_var] = df[group_var]
-    agg = numeric_df.groupby(group_var).agg(['mean', 'max', 'min', 'sum'])
+    
+    agg = numeric_df.groupby(group_var).agg(['mean', 'max', 'min', 'sum', 'var'])
+    
     columns = []
     for var in agg.columns.levels[0]:
         for stat in agg.columns.levels[1]:
             columns.append(f'{df_name}_{var}_{stat}')
+    
     agg.columns = columns
     return agg.reset_index()
 
 def main():
-    print("Iniciando integracion de datos...")
+    print("Iniciando integracion masiva de datos...")
     
     path_app = os.path.join(DATA_DIR, 'application_.parquet')
     if not os.path.exists(path_app):
@@ -27,11 +32,11 @@ def main():
         return
 
     df_main = pd.read_parquet(path_app, engine='pyarrow')
-    print(f"Filas iniciales: {df_main.shape[0]}")
+    print(f"Base principal: {df_main.shape}")
 
     path_bureau = os.path.join(DATA_DIR, 'bureau.parquet')
     if os.path.exists(path_bureau):
-        print("Procesando bureau.parquet...")
+        print("Integrando Bureau...")
         bureau = pd.read_parquet(path_bureau, engine='pyarrow')
         bureau_agg = agg_numeric(bureau.drop(columns=['SK_ID_BUREAU']), group_var='SK_ID_CURR', df_name='bureau')
         df_main = df_main.merge(bureau_agg, on='SK_ID_CURR', how='left')
@@ -40,29 +45,70 @@ def main():
 
     path_prev = os.path.join(DATA_DIR, 'previous_application.parquet')
     if os.path.exists(path_prev):
-        print("Procesando previous_application.parquet...")
+        print("Integrando Previous Application...")
         prev = pd.read_parquet(path_prev, engine='pyarrow')
         prev_agg = agg_numeric(prev.drop(columns=['SK_ID_PREV']), group_var='SK_ID_CURR', df_name='prev')
         df_main = df_main.merge(prev_agg, on='SK_ID_CURR', how='left')
         del prev, prev_agg
         gc.collect()
 
-    print("Calculando Ratios Financieros y de Dominio...")
+    path_pos = os.path.join(DATA_DIR, 'POS_CASH_balance.parquet')
+    if os.path.exists(path_pos):
+        print("Integrando POS CASH...")
+        pos = pd.read_parquet(path_pos, engine='pyarrow')
+        pos_agg = agg_numeric(pos.drop(columns=['SK_ID_PREV']), group_var='SK_ID_CURR', df_name='pos')
+        df_main = df_main.merge(pos_agg, on='SK_ID_CURR', how='left')
+        del pos, pos_agg
+        gc.collect()
+
+    path_inst = os.path.join(DATA_DIR, 'installments_payments.parquet')
+    if os.path.exists(path_inst):
+        print("Integrando Installments Payments (Esto toma tiempo)...")
+        inst = pd.read_parquet(path_inst, engine='pyarrow')
+        
+        inst['PAYMENT_DIFF'] = inst['DAYS_ENTRY_PAYMENT'] - inst['DAYS_INSTALMENT']
+        inst['PAYMENT_OVERDUE'] = inst['PAYMENT_DIFF'].apply(lambda x: 1 if x > 0 else 0)
+        
+        inst_agg = agg_numeric(inst.drop(columns=['SK_ID_PREV']), group_var='SK_ID_CURR', df_name='inst')
+        df_main = df_main.merge(inst_agg, on='SK_ID_CURR', how='left')
+        del inst, inst_agg
+        gc.collect()
+
+    path_cc = os.path.join(DATA_DIR, 'credit_card_balance.parquet')
+    if os.path.exists(path_cc):
+        print("Integrando Credit Card Balance...")
+        cc = pd.read_parquet(path_cc, engine='pyarrow')
+        cc_agg = agg_numeric(cc.drop(columns=['SK_ID_PREV']), group_var='SK_ID_CURR', df_name='cc')
+        df_main = df_main.merge(cc_agg, on='SK_ID_CURR', how='left')
+        del cc, cc_agg
+        gc.collect()
+
+    print("Generando Features Polinomicas...")
+    
     df_main['PAYMENT_RATE'] = df_main['AMT_ANNUITY'] / df_main['AMT_CREDIT']
     df_main['INCOME_CREDIT_RATIO'] = df_main['AMT_INCOME_TOTAL'] / df_main['AMT_CREDIT']
-    
     df_main['DAYS_EMPLOYED_PERC'] = df_main['DAYS_EMPLOYED'] / df_main['DAYS_BIRTH']
-    
     df_main['INCOME_PER_PERSON'] = df_main['AMT_INCOME_TOTAL'] / df_main['CNT_FAM_MEMBERS']
-    
     df_main['CREDIT_TERM'] = df_main['AMT_ANNUITY'] / df_main['AMT_CREDIT']
 
+    for col in ['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']:
+        if col not in df_main.columns:
+            df_main[col] = np.nan
+
+    df_main['EXT_SOURCE_1'] = df_main['EXT_SOURCE_1'].fillna(df_main['EXT_SOURCE_1'].median())
+    df_main['EXT_SOURCE_2'] = df_main['EXT_SOURCE_2'].fillna(df_main['EXT_SOURCE_2'].median())
+    df_main['EXT_SOURCE_3'] = df_main['EXT_SOURCE_3'].fillna(df_main['EXT_SOURCE_3'].median())
+
+    df_main['EXT_SOURCE_PROD'] = df_main['EXT_SOURCE_1'] * df_main['EXT_SOURCE_2'] * df_main['EXT_SOURCE_3']
+    
     print("Limpiando y guardando...")
     df_main = df_main.replace([np.inf, -np.inf], np.nan)
     
+    df_main = df_main.loc[:, ~df_main.columns.duplicated()]
+    
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     df_main.to_parquet(OUTPUT_FILE, engine='pyarrow')
-    print(f"Dataset maestro guardado en: {OUTPUT_FILE}")
+    print(f"Dataset FINAL guardado en: {OUTPUT_FILE}")
     print(f"Dimensiones finales: {df_main.shape}")
 
 if __name__ == "__main__":

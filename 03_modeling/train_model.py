@@ -6,16 +6,14 @@ from sklearn.metrics import classification_report, roc_auc_score
 import joblib
 import os
 
-# CORRECCIÓN: Rutas ajustadas para ejecutar desde la carpeta ML
 DATA_PATH = "02_data_preparation/master_table.parquet"
 ARTIFACTS_DIR = "artifacts"
 
 def train():
-    print("Iniciando Entrenamiento del Modelo...")
+    print("Iniciando Entrenamiento Avanzado...")
     
     if not os.path.exists(DATA_PATH):
         print(f"Error: No se encuentra {DATA_PATH}")
-        print("Verifica que hayas ejecutado el paso anterior (make_dataset.py)")
         return
         
     df = pd.read_parquet(DATA_PATH)
@@ -33,34 +31,34 @@ def train():
     
     ratio = float(np.sum(y == 0)) / np.sum(y == 1)
     
-    print("Ajustando desbalance (Ratio: {:.2f})...".format(ratio))
-    
     model = XGBClassifier(
-        n_estimators=200,
-        max_depth=5,  
-        learning_rate=0.05, 
-        scale_pos_weight=ratio, 
-        subsample=0.8,     
-        colsample_bytree=0.8,
+        n_estimators=500,
+        max_depth=6,
+        learning_rate=0.02,
+        scale_pos_weight=ratio,
+        subsample=0.8,
+        colsample_bytree=0.7,
+        reg_lambda=10,
         random_state=42,
         n_jobs=-1
     )
     
-    print("Entrenando XGBoost...")
+    print("Entrenando XGBoost (Mode: Hardcore)...")
     model.fit(X_train, y_train)
     
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
     
     print(classification_report(y_test, y_pred))
-    print(f"AUC-ROC Score: {roc_auc_score(y_test, y_prob):.4f}")
+    auc = roc_auc_score(y_test, y_prob)
+    print(f"AUC-ROC Score Final: {auc:.4f}")
     
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
     
     joblib.dump(model, os.path.join(ARTIFACTS_DIR, "xgboost_model.joblib"))
     joblib.dump(X.columns.tolist(), os.path.join(ARTIFACTS_DIR, "model_features.joblib"))
     
-    print("Modelo y features guardados correctamente en artifacts.")
+    print("Modelo guardado.")
 
 if __name__ == "__main__":
     train()
