@@ -47,6 +47,10 @@ def main():
         del prev, prev_agg
         gc.collect()
 
+    print("Calculando Ratios Financieros...")
+    df_main['PAYMENT_RATE'] = df_main['AMT_ANNUITY'] / df_main['AMT_CREDIT']
+    df_main['INCOME_CREDIT_RATIO'] = df_main['AMT_INCOME_TOTAL'] / df_main['AMT_CREDIT']
+
     print("Limpiando y guardando...")
     df_main = df_main.replace([np.inf, -np.inf], np.nan)
     

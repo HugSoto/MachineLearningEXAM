@@ -1,9 +1,9 @@
 pandas
 numpy
 scikit-learn
+xgboost
 matplotlib
 seaborn
 pyarrow
-fastapi
-uvicorn
 joblib
+streamlit
