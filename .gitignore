@@ -1,2 +1,14 @@
-"*.parquet" 
-*.parquet 
+# Datos
+*.parquet
+*.csv
+*.zip
+
+# Modelos grandes
+*.pkl
+*.joblib
+
+# Entornos y temporales
+__pycache__/
+.env
+.ipynb_checkpoints/
+venv/
